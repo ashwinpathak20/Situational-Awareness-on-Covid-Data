@@ -15,6 +15,8 @@ def csvToJson(csv_path, json_path): # date_file_path, last_fetched_date):
             # max_date_fetched = max(curr_date, max_date_fetched)
             if rows["country"] in countries: #curr_date > last_fetched_date and
                 rows["id"] = rows["date"] + "#" + rows["country"]
+                if rows["deaths"] == "":
+                    rows["deaths"] = 0
                 us_data.append(rows)
 
     with open(json_path, 'a', encoding='utf-8') as json_file:
