@@ -89,7 +89,9 @@ class CovidDataAutomation:
         print("----------------------------------------")
         print("Fetching the last fetched date...")
         self.data = self.data[self.data['date'] > last_fetched_date]
+        self.data['id'] = self.data['country'] + "#" + self.data['date']
         self.total_dataset_size = len(self.data.index)
+
 
 
 def main():
