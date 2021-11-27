@@ -6,6 +6,7 @@ from django.http import HttpResponse
 import json
 
 from django.template import loader
+from sklearn.model_selection import train_test_split
 
 from covidDashboard.settings import BASE_DIR
 
@@ -19,6 +20,7 @@ from statsmodels.stats.stattools import durbin_watson
 from statsmodels.tsa.stattools import grangercausalitytests
 from sklearn.metrics import mean_squared_error
 from sklearn.metrics import mean_absolute_error
+from sklearn.ensemble import RandomForestRegressor
 
 class CausalityModel:
 
@@ -197,6 +199,29 @@ class CausalityModel:
             return df
         print(grangers_causation_matrix(df, variables = df.columns))
 
+    def prediction_regression(self, df, country1, country2):
+        country_to_index = dict({df.columns[0]:0,df.columns[1]:1,df.columns[2]:2,df.columns[3]:3})
+        cases = df.to_numpy()
+        cases_country1 = cases[:,country_to_index[country1]]
+        cases_country2 = cases[:,country_to_index[country2]]
+
+        X, X_test, y, y_test = train_test_split(cases_country1, cases_country2, test_size=0.25, random_state=42)
+        X = X.reshape(-1,1)
+        X_test = X_test.reshape(-1,1)
+        y = y.reshape(-1,1)
+        y_test = y_test.reshape(-1,1)
+        regr = RandomForestRegressor(max_depth=2, random_state=0)
+        regr.fit(X, y)
+        output = regr.predict(X_test)
+
+        output = output.reshape(-1,1)
+        to_plot = np.concatenate((output, y_test), axis=1)
+        df_plots = pd.DataFrame(to_plot, columns=[country2+' predicted', country2])
+        fig = px.line(df_plots, title='Prediction between ' + country1 + ' and ' + country2, facet_col_wrap=1)
+        fig.update_yaxes(matches=None)
+        graph = fig.to_html(full_html=False, default_height=500, default_width=700)
+        return graph
+
 def index(request):
     causalityModel = CausalityModel()
     context = {}
@@ -213,5 +238,20 @@ def index(request):
     causalityModel.vartest(causalityModel.df_train_transformed)
     causalityModel.granger_causality(causalityModel.df_cases_diff)
     causalityModel.granger_causality(causalityModel.df_train_transformed)
+    countries_list = list(causalityModel.countries)
+    for i in range(len(countries_list)):
+        for j in range(i):
+            a = countries_list[i]
+            b = countries_list[j]
+            if a == 'United States':
+                a = 'UnitedStates'
+            if a == 'European Union':
+                a = 'European'
+            if b == 'United States':
+                b = 'UnitedStates'
+            if b == 'European Union':
+                b = 'European'
+            context['graphPrediction'+a+b] =causalityModel.prediction_regression(causalityModel.df_cases_diff, countries_list[i], countries_list[j])
+            context['graphPrediction'+b+a] =causalityModel.prediction_regression(causalityModel.df_cases_diff, countries_list[j], countries_list[i])
     html_template = loader.get_template('home/index.html')
     return HttpResponse(html_template.render(context, request))
