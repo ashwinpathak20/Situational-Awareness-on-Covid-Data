@@ -8,11 +8,11 @@
 {% block content %}
     <div class="container-fluid py-4">
       <div class="row mt-4">
-        <div class="col-lg-6 mb-lg-0 mb-4">
+        <!--<div class="col-lg-6 mb-lg-0 mb-4">
           <div class="card">
               {{graphCases|safe}}
           </div>
-        </div>
+        </div>-->
         <div class="col-lg-6 mb-lg-0 mb-4">
           <div class="card">
               {{graphCasesArea|safe}}
@@ -118,6 +118,119 @@
           </div>
         </div>
       </div>
+
+      <div class="container-fluid py-4">
+        <div class="row mt-4">
+          <!--<div class="col-lg-6 mb-lg-0 mb-4">
+            <div class="card">
+              {{graphDeaths|safe}}
+            </div>
+          </div>-->
+          <div class="col-lg-6 mb-lg-0 mb-4">
+            <div class="card">
+              {{graphDeathsArea|safe}}
+            </div>
+          </div>
+        </div>
+
+        <div class="row mt-4">
+          <div class="col-lg-6 mb-lg-0 mb-4">
+            <div class="card">
+              {{graphDeathsDaily|safe}}
+            </div>
+          </div>
+          <div class="col-lg-6 mb-lg-0 mb-4">
+            <div class="card">
+              {{graphDeathsAreaDaily|safe}}
+            </div>
+          </div>
+        </div>
+
+        <div class="row mt-4">
+          <div class="col-lg-6 mb-lg-0 mb-4">
+            <div class="card">
+              {{graphAdfDeathsTest|safe}}
+            </div>
+          </div>
+          <div class="col-lg-6 mb-lg-0 mb-4">
+            <div class="card">
+              {{graphDeathsPredictionChinaIndia|safe}}
+            </div>
+          </div>
+        </div>
+
+        <div class="row mt-4">
+          <div class="col-lg-6 mb-lg-0 mb-4">
+            <div class="card">
+              {{graphDeathsPredictionIndiaChina|safe}}
+            </div>
+          </div>
+          <div class="col-lg-6 mb-lg-0 mb-4">
+            <div class="card">
+              {{graphDeathsPredictionChinaUnitedStates|safe}}
+            </div>
+          </div>
+        </div>
+
+        <div class="row mt-4">
+          <div class="col-lg-6 mb-lg-0 mb-4">
+            <div class="card">
+              {{graphDeathsPredictionUnitedStatesChina|safe}}
+            </div>
+          </div>
+          <div class="col-lg-6 mb-lg-0 mb-4">
+            <div class="card">
+              {{graphDeathsPredictionChinaEuropean|safe}}
+            </div>
+          </div>
+        </div>
+
+        <div class="row mt-4">
+          <div class="col-lg-6 mb-lg-0 mb-4">
+            <div class="card">
+              {{graphDeathsPredictionEuropeanChina|safe}}
+            </div>
+          </div>
+          <div class="col-lg-6 mb-lg-0 mb-4">
+            <div class="card">
+              {{graphDeathsPredictionIndiaUnitedStates|safe}}
+            </div>
+          </div>
+        </div>
+
+        <div class="row mt-4">
+          <div class="col-lg-6 mb-lg-0 mb-4">
+            <div class="card">
+              {{graphDeathsPredictionUnitedStatesIndia|safe}}
+            </div>
+          </div>
+          <div class="col-lg-6 mb-lg-0 mb-4">
+            <div class="card">
+              {{graphDeathsPredictionIndiaEuropean|safe}}
+            </div>
+          </div>
+        </div>
+
+        <div class="row mt-4">
+          <div class="col-lg-6 mb-lg-0 mb-4">
+            <div class="card">
+              {{graphDeathsPredictionEuropeanIndia|safe}}
+            </div>
+          </div>
+          <div class="col-lg-6 mb-lg-0 mb-4">
+            <div class="card">
+              {{graphDeathsPredictionUnitedStatesEuropean|safe}}
+            </div>
+          </div>
+        </div>
+
+        <div class="row mt-4">
+          <div class="col-lg-6 mb-lg-0 mb-4">
+            <div class="card">
+              {{graphDeathsPredictionEuropeanUnitedStates|safe}}
+            </div>
+          </div>
+        </div>
 
 
       {% include "includes/footer.html" %}

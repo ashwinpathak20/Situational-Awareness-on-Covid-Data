@@ -22,15 +22,108 @@ from sklearn.metrics import mean_squared_error
 from sklearn.metrics import mean_absolute_error
 from sklearn.ensemble import RandomForestRegressor
 
+COVID_CSV_DATA_URL = "https://raw.githubusercontent.com/owid/covid-19-data/master/public/data/owid-covid-data.csv"
+
+
+class CovidDataAutomation:
+
+    def __init__(self, url):
+        self.url = url
+        self.required_columns = ['location', 'date', 'total_cases_per_million', 'total_deaths_per_million']
+        self.allowed_countries = ["India", "China", "United States", "European Union"]
+
+    def run(self):
+        print("========================================")
+        print("Loading Data...")
+        print("----------------------------------------")
+        self.load_data()
+        print("Starting to process data...")
+        self.process_incrementally()
+        print("----------------------------------------")
+        print("Writing output to json file...")
+        self.write_json_file()
+        print("========================================")
+        print("Processed {} Covid Data Records successfully".format(self.total_dataset_size))
+        print("")
+        print("Execution Completed.")
+
+    @staticmethod
+    def get_start_of_century():
+        return '2000-01-01'
+
+    @staticmethod
+    def read_from_local_covid_data_file():
+        with open('last_fetched_date.txt', 'r') as file:
+            lines = file.readline().rstrip()
+            yield lines
+            return
+            """for line in lines:
+                yield line
+                return"""
+
+    @staticmethod
+    def get_last_date_fetched():
+        last_fetched_date = "2000-01-01"
+        try:
+            last_fetched_date = [x for x in CovidDataAutomation.read_from_local_covid_data_file()][0]
+            if not last_fetched_date or len(last_fetched_date.strip()) == 0:
+                last_fetched_date = CovidDataAutomation.get_start_of_century()
+
+        finally:
+            print("----------------------------------------")
+            print("Processing records after {}".format(last_fetched_date))
+            return last_fetched_date
+
+    @staticmethod
+    def store_last_date_fetched(last_fetched_date):
+        with open("last_fetched_date.txt", "w") as file:
+            file.write(last_fetched_date)
+
+    @staticmethod
+    def get_column_name_mappings():
+        return {
+            'location': 'country',
+            'total_cases_per_million': 'total_cases',
+            'total_deaths_per_million': 'total_deaths'
+        }
+
+    def load_data(self):
+        self.data = pd.read_csv(self.url)
+
+    def write_json_file(self):
+        records = self.data.to_json(orient='records')
+        records = json.loads(records)
+
+        with open('covid_data.json', 'a') as file:
+            for record in records:
+                file.write(json.dumps(record))
+
+    def process_incrementally(self):
+        self.data = self.data[self.required_columns] \
+            .rename(columns=CovidDataAutomation.get_column_name_mappings()) \
+            .fillna(0)
+        self.data = self.data[(self.data["country"].isin(self.allowed_countries))] \
+            .sort_values(by='date', ascending=False)
+
+        last_fetched_date = CovidDataAutomation.get_last_date_fetched()
+        CovidDataAutomation.store_last_date_fetched(self.data["date"].values[0])
+
+        print("----------------------------------------")
+        print("Fetching the last fetched date...")
+        self.data = self.data[self.data['date'] > last_fetched_date]
+        self.data['id'] = self.data['country'] + "#" + self.data['date']
+        self.total_dataset_size = len(self.data.index)
+
 class CausalityModel:
 
     def __init__(self):
+        automation_agent = CovidDataAutomation(COVID_CSV_DATA_URL)
+        automation_agent.run()
         try:
             conn = MongoClient()
             print("Connected successfully!!!")
         except:
             print("Could not connect to MongoDB")
-        print(BASE_DIR)
         # database
         db = conn.database
         f = open(os.path.join(BASE_DIR, 'covid_data.json'))
@@ -62,22 +155,33 @@ class CausalityModel:
             if co == 0:
                 temp['cases'] = temp['cases'].astype(float)
                 df_cases = temp[['date', 'cases']].rename(columns={'cases':country})
+                temp['deaths'] = temp['deaths'].astype(float)
+                df_deaths = temp[['date', 'deaths']].rename(columns={'deaths':country})
                 co = 1
             else:
                 temp['cases'] = temp['cases'].astype(float)
                 temp1 = temp[['date', 'cases']]
                 df_cases = df_cases.merge(temp1, on='date', how='right').rename(columns={'cases':country})
+                temp['deaths'] = temp['deaths'].astype(float)
+                temp1 = temp[['date', 'deaths']]
+                df_deaths = df_deaths.merge(temp1, on='date', how='right').rename(columns={'deaths':country})
 
         df_cases = df_cases.dropna()
         df_cases['date'] =  pd.to_datetime(df_cases['date'])
         self.df_cases = df_cases.set_index('date').rename_axis('country', axis=1)
+        df_deaths = df_deaths.dropna()
+        df_deaths['date'] =  pd.to_datetime(df_deaths['date'])
+        self.df_deaths = df_deaths.set_index('date').rename_axis('country', axis=1)
 
         self.country_dataFrames_diff = dict()
         for country in self.countries:
             country_data = list(self.collection.find({'country':country}))
+            country_data = sorted(country_data, key = lambda i: (i['date']), reverse = True)
             for i in range(0,len(country_data)-1):
                 diff = max(0,country_data[i]['cases'] - country_data[i+1]['cases'])
                 country_data[i]['cases'] = diff
+                diff = max(0,country_data[i]['deaths'] - country_data[i+1]['deaths'])
+                country_data[i]['deaths'] = diff
             self.country_dataFrames_diff[country] = pd.DataFrame(country_data)
 
         co = 0
@@ -86,16 +190,26 @@ class CausalityModel:
             if co == 0:
                 temp['cases'] = temp['cases'].astype(float)
                 df_cases = temp[['date', 'cases']].rename(columns={'cases':country})
+                temp['deaths'] = temp['deaths'].astype(float)
+                df_deaths = temp[['date', 'deaths']].rename(columns={'deaths':country})
                 co = 1
             else:
                 temp['cases'] = temp['cases'].astype(float)
                 temp1 = temp[['date', 'cases']]
                 df_cases = df_cases.merge(temp1, on='date', how='right').rename(columns={'cases':country})
-
+                temp['deaths'] = temp['deaths'].astype(float)
+                temp1 = temp[['date', 'deaths']]
+                df_deaths = df_deaths.merge(temp1, on='date', how='right').rename(columns={'deaths':country})
         df_cases = df_cases.dropna()
-        df_cases['date'] =  pd.to_datetime(df_cases['date'])
+        df_cases['date'] = pd.to_datetime(df_cases['date'])
+        df_cases = df_cases.sort_values(by='date')
         self.df_cases_diff = df_cases.set_index('date').rename_axis('country', axis=1)
         self.df_train_transformed = self.df_cases_diff.diff().dropna()
+
+        df_deaths = df_deaths.dropna()
+        df_deaths['date'] =  pd.to_datetime(df_deaths['date'])
+        self.df_deaths_deaths = df_deaths.set_index('date').rename_axis('country', axis=1)
+        self.df_train_transformed_deaths = self.df_deaths_deaths.diff().dropna()
 
 
     def visualizeCases(self, df):
@@ -106,6 +220,18 @@ class CausalityModel:
 
     def visualizeCasesArea(self, df):
         fig = px.area(df, facet_col="country", title='Cases Area Graph', facet_col_wrap=1)
+        fig.update_yaxes(matches=None)
+        graph = fig.to_html(full_html=False, default_height=500, default_width=700)
+        return graph
+
+    def visualizeDeaths(self, df):
+        fig = px.line(df, facet_col="country", title='Deaths Graph', facet_col_wrap=1)
+        fig.update_yaxes(matches=None)
+        graph = fig.to_html(full_html=False, default_height=500, default_width=700)
+        return graph
+
+    def visualizeDeathsArea(self, df):
+        fig = px.area(df, facet_col="country", title='Deaths Area Graph', facet_col_wrap=1)
         fig.update_yaxes(matches=None)
         graph = fig.to_html(full_html=False, default_height=500, default_width=700)
         return graph
@@ -225,7 +351,7 @@ class CausalityModel:
 def index(request):
     causalityModel = CausalityModel()
     context = {}
-    context['graphCases'] = causalityModel.visualizeCases(causalityModel.df_cases)
+    #context['graphCases'] = causalityModel.visualizeCases(causalityModel.df_cases)
     context['graphCasesArea'] = causalityModel.visualizeCasesArea(causalityModel.df_cases)
     context['graphCasesDaily'] = causalityModel.visualizeCases(causalityModel.df_cases_diff)
     context['graphCasesAreaDaily'] = causalityModel.visualizeCasesArea(causalityModel.df_cases_diff)
@@ -253,5 +379,33 @@ def index(request):
                 b = 'European'
             context['graphPrediction'+a+b] =causalityModel.prediction_regression(causalityModel.df_cases_diff, countries_list[i], countries_list[j])
             context['graphPrediction'+b+a] =causalityModel.prediction_regression(causalityModel.df_cases_diff, countries_list[j], countries_list[i])
+    #context['graphDeaths'] = causalityModel.visualizeDeaths(causalityModel.df_deaths)
+    context['graphDeathsArea'] = causalityModel.visualizeDeathsArea(causalityModel.df_deaths)
+    context['graphDeathsDaily'] = causalityModel.visualizeDeaths(causalityModel.df_deaths_deaths)
+    context['graphDeathsAreaDaily'] = causalityModel.visualizeDeathsArea(causalityModel.df_deaths_deaths)
+    context['graphAdfDeathsTest'] = causalityModel.visualizeDeathsArea(causalityModel.df_train_transformed_deaths)
+    causalityModel.adftest(causalityModel.df_deaths_deaths)
+    causalityModel.adftest(causalityModel.df_train_transformed_deaths)
+    causalityModel.kpsstest(causalityModel.df_deaths_deaths)
+    causalityModel.kpsstest(causalityModel.df_train_transformed_deaths)
+    causalityModel.vartest(causalityModel.df_deaths_deaths)
+    causalityModel.vartest(causalityModel.df_train_transformed_deaths)
+    causalityModel.granger_causality(causalityModel.df_deaths_deaths)
+    causalityModel.granger_causality(causalityModel.df_train_transformed_deaths)
+    countries_list = list(causalityModel.countries)
+    for i in range(len(countries_list)):
+        for j in range(i):
+            a = countries_list[i]
+            b = countries_list[j]
+            if a == 'United States':
+                a = 'UnitedStates'
+            if a == 'European Union':
+                a = 'European'
+            if b == 'United States':
+                b = 'UnitedStates'
+            if b == 'European Union':
+                b = 'European'
+            context['graphDeathsPrediction'+a+b] =causalityModel.prediction_regression(causalityModel.df_deaths_deaths, countries_list[i], countries_list[j])
+            context['graphDeathsPrediction'+b+a] =causalityModel.prediction_regression(causalityModel.df_deaths_deaths, countries_list[j], countries_list[i])
     html_template = loader.get_template('home/index.html')
     return HttpResponse(html_template.render(context, request))
